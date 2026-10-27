@@ -262,4 +262,3 @@ Contributors are recognized in:
 - [Project Roadmap](https://sandraschi.github.io/handbrake-mcp/about/roadmap/)
 
 Thank you for contributing to the HandBrake MCP Server! 🚀
-

@@ -18,10 +18,12 @@ repos:
     hooks:
       - id: biome-web
         name: biome check (webapp)
-        entry: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/pre-commit-biome.ps1
+        entry: scripts/pre-commit-biome.sh
         language: system
         # Keep in sync with ci.yml.template frontend detection + pre-commit-biome.ps1
         # (webapp/ canonical first, then legacy variants).
+        # This fork runs pre-commit natively on Linux, so the POSIX counterpart is used.
+        # Windows hosts: swap the entry for `scripts/pre-commit-biome.ps1`.
         files: ^(webapp(/frontend)?|web_sota|web-sota|web|frontend|ui|web_app)/(.*\.(ts|tsx|js|jsx)|biome\.json)$
         pass_filenames: false
         require_serial: true
