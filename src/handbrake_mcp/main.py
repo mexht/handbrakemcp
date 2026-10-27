@@ -144,13 +144,16 @@ class LaunchRequest(BaseModel):
 
 @app.post("/api/fleet/launch")
 async def launch_app(request: LaunchRequest):
-    """Launch another MCP app via its start.ps1 script."""
+    """Launch another MCP app via its start script (start.ps1 on Windows, start.sh on POSIX)."""
+    import os
+
     path = Path(request.repo_path)
     if not path.exists():
         return {"success": False, "error": f"Path {request.repo_path} does not exist"}
 
     # Security check: ensure the path is within the allowed repos directory
-    allowed_base = Path("D:/Dev/repos")
+    # (FLEET_REPOS_ROOT lets the fleet root live outside the Windows default)
+    allowed_base = Path(os.environ.get("FLEET_REPOS_ROOT", "D:/Dev/repos"))
     try:
         path.relative_to(allowed_base)
     except ValueError:
@@ -159,29 +162,38 @@ async def launch_app(request: LaunchRequest):
             "error": "Access denied: outside allowed repository root",
         }
 
-    start_script = path / "web_sota" / "start.ps1"
-    if not start_script.exists():
-        # Fallback for older structures
-        start_script = path / "web" / "start.ps1"
+    if os.name == "nt":
+        start_script = path / "web_sota" / "start.ps1"
         if not start_script.exists():
-            return {
-                "success": False,
-                "error": f"No start.ps1 found in {request.repo_path}",
-            }
+            # Fallback for older structures
+            start_script = path / "web" / "start.ps1"
+            if not start_script.exists():
+                return {
+                    "success": False,
+                    "error": f"No start.ps1 found in {request.repo_path}",
+                }
+        cmd = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(start_script)]
+        kwargs: dict = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
+    else:
+        start_script = path / "web_sota" / "start.sh"
+        if not start_script.exists():
+            # Fallback for older structures
+            start_script = path / "web" / "start.sh"
+            if not start_script.exists():
+                return {
+                    "success": False,
+                    "error": f"No start.sh found in {request.repo_path}",
+                }
+        cmd = ["/bin/sh", str(start_script)]
+        # Detach from the server so the launched app survives this process
+        kwargs = {"start_new_session": True}
 
     try:
-        # Start the process in the background using powershell
-        # Use -windowstyle hidden if we don't want a pop-up, but for now let's keep it visible for debugging if needed
+        # Start the process in the background
         subprocess.Popen(
-            [
-                "powershell.exe",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                str(start_script),
-            ],
+            cmd,
             cwd=str(path),  # Important for relative paths in the script
-            creationflags=subprocess.CREATE_NEW_CONSOLE,  # Run in a new window so it persists
+            **kwargs,
         )
         return {
             "success": True,

@@ -1,4 +1,19 @@
 
+## [Unreleased] — 2026-10-27 (linux compat, `local` branch)
+
+### Added
+- **Full Linux compatibility**: the server now runs natively on Linux (Windows and Linux both supported).
+  - `core/config.py`: `winget_hbb_path` replaced by platform-aware `hbb_fallback_paths` (winget links dir on Windows; `/usr/bin`, `/usr/local/bin`, `/opt/handbrake` on Linux). Overridable via `HBB_FALLBACK_PATHS=a,b,c`.
+  - `services/handbrake.py`: `gui_install_paths()` covers distro GUI locations (`/usr/bin/handbrake[-gtk]`); probe and `_find_handbrake()` walk the fallback list; shared `cli_install_hint()` emits winget guidance on Windows, apt/dnf/pacman guidance on Linux. Path validation keeps the drive-letter colon rule Windows-only — POSIX `file:name.mp4` is now legal.
+  - `server.py`: instructions state Windows **and** Linux; `/api/v1/diagnostics` reports `platform`/`linux`; `/health` hint uses `cli_install_hint()`; `/api/browse` picker roots are POSIX mounts (`/`, `/home`, `/mnt`, `/media`, home) instead of `A:\`–`Z:\` scans.
+  - `main.py` (legacy entry): `/api/fleet/launch` launches `start.sh` via `/bin/sh` with `start_new_session` on POSIX (no more `powershell.exe`/`CREATE_NEW_CONSOLE` crash); fleet root configurable via `FLEET_REPOS_ROOT`.
+  - `justfile`: lint/fix/check-sec/bootstrap recipes portable (`cd … && …`, no `Set-Location`/`Write-Host`).
+- Probe fallback test + POSIX colon path-validation test (skipped on Windows).
+
+### Updated
+- `.env.example`: `HBB_PATH=HandBrakeCLI` with the Windows absolute-path example removed; `HBB_FALLBACK_PATHS` documented.
+- `docs/ONBOARDING.md`: Linux install commands in first-timer steps; GUI-vs-CLI and terminal pitfalls now platform-labelled (the shell-restart trap is Windows-only).
+
 ## [Unreleased] — 2026-10-23 (app bugs)
 
 ### Fixed

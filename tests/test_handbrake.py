@@ -202,7 +202,7 @@ class TestHandBrakeServiceUnit:
 
         with (
             patch("shutil.which", return_value=None),
-            patch.object(settings, "winget_hbb_path", str(tmp_path / "nope.exe")),
+            patch.object(settings, "hbb_fallback_paths", [str(tmp_path / "nope.exe")]),
             patch.object(hb_module, "gui_install_paths", return_value=[]),
         ):
             result = probe_handbrake_cli()
@@ -218,11 +218,38 @@ class TestHandBrakeServiceUnit:
         fake_gui.write_bytes(b"fake")
         with (
             patch("shutil.which", return_value=None),
-            patch.object(settings, "winget_hbb_path", str(tmp_path / "nope.exe")),
+            patch.object(settings, "hbb_fallback_paths", [str(tmp_path / "nope.exe")]),
             patch.object(hb_module, "gui_install_paths", return_value=[str(fake_gui)]),
         ):
             result = probe_handbrake_cli()
         assert result == {"available": False, "path": None, "gui_present": True}
+
+    def test_probe_cli_via_platform_fallback(self, tmp_path):
+        """Probe resolves the CLI through the platform fallback list when PATH misses."""
+        from handbrake_mcp.core.config import settings
+        from handbrake_mcp.services import handbrake as hb_module
+        from handbrake_mcp.services.handbrake import probe_handbrake_cli
+
+        fake_cli = tmp_path / "HandBrakeCLI"
+        fake_cli.write_bytes(b"#!/bin/sh\n")
+        with (
+            patch("shutil.which", return_value=None),
+            patch.object(settings, "hbb_fallback_paths", [str(fake_cli)]),
+            patch.object(hb_module, "gui_install_paths", return_value=[]),
+        ):
+            result = probe_handbrake_cli()
+        assert result == {"available": True, "path": str(fake_cli), "gui_present": False}
+
+    def test_validate_path_posix_colon(self, tmp_path):
+        """POSIX allows ':' inside filenames; the drive-letter rule stays Windows-only."""
+        if os.name == "nt":
+            pytest.skip("drive-letter rule is the Windows behavior")
+        from handbrake_mcp.services.handbrake import HandBrakeService
+
+        clip = tmp_path / "clip:2024.mp4"
+        clip.write_bytes(b"x" * 2048)
+        resolved = HandBrakeService._validate_and_secure_path(HandBrakeService, str(clip))
+        assert resolved == clip.resolve()
 
     def test_parse_presets_modern_cli(self):
         """Parser handles the HandBrakeCLI 1.11 stderr shape (no log/category leakage)."""
@@ -255,27 +282,27 @@ class TestHandBrakeServiceUnit:
             "Progress: {\n"
             '    "Working": {\n'
             '        "ETASeconds": 12,\n'
-            '        "Progress": 0.4277777,\n'
+            '        "Progress": 0.4277777\n'
             "    }\n"
             "}\n"
             "Progress: {\n"
             '    "Working": {\n'
             '        "ETASeconds": 0,\n'
-            '        "Progress": 1.0,\n'
+            '        "Progress": 1.0\n'
             "    }\n"
             "}\n"
         )
-        assert HandBrakeService._extract_progress(HandBrakeService, transcript) == 100.0
+        assert HandBrakeService._extract_progress(transcript) == 100.0
 
     def test_extract_progress_ignores_noise(self):
         """Parser returns None with no complete progress block, never raises."""
         from handbrake_mcp.services.handbrake import HandBrakeService
 
-        assert HandBrakeService._extract_progress(HandBrakeService, "") is None
-        assert HandBrakeService._extract_progress(HandBrakeService, "[10:35:18] hb_init: x\n") is None
+        assert HandBrakeService._extract_progress("") is None
+        assert HandBrakeService._extract_progress("[10:35:18] hb_init: x\n") is None
         # truncated block: braces never balance
-        assert HandBrakeService._extract_progress(HandBrakeService, 'Progress: {\n    "Working": {\n') is None
-        assert HandBrakeService._extract_progress(HandBrakeService, "not json at all {{{") is None
+        assert HandBrakeService._extract_progress('Progress: {\n    "Working": {\n') is None
+        assert HandBrakeService._extract_progress("not json at all {{{") is None
 
 
 @pytest.fixture
@@ -363,10 +390,11 @@ class TestHandBrakeServiceIntegration:
         assert version is not None
         assert version != "unknown"
 
-        # Version should be in format like "1.11.2"
+        # Dotted semver (Windows/macOS packaging) or Arch/git nightly
+        # build identifiers like "20260607133641-9eb6c9368-makepkg".
         import re
 
-        assert re.match(r"\d+\.\d+\.\d+", version)
+        assert re.match(r"\d+\.\d+\.\d+|\d{8,}[-\w]*", version)
 
     async def test_real_job_status_tracking(self, integration_test_setup):
         """Test job status tracking during real transcoding.

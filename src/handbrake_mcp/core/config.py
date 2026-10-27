@@ -1,7 +1,24 @@
+import os
 from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_hbb_fallback_paths() -> list[str]:
+    """Platform-appropriate HandBrakeCLI locations tried when PATH lookup fails.
+
+    Windows: winget's per-user links dir for the *current* user. Linux: the
+    usual distro-packaging locations (Debian/Ubuntu, Arch and from-source
+    installs). Override with `HBB_FALLBACK_PATHS=a,b,c` in the environment.
+    """
+    if os.name == "nt":
+        return [str(Path.home() / "AppData" / "Local" / "Microsoft" / "WinGet" / "Links" / "HandBrakeCLI.exe")]
+    return [
+        "/usr/bin/HandBrakeCLI",
+        "/usr/local/bin/HandBrakeCLI",
+        "/opt/handbrake/HandBrakeCLI",
+    ]
 
 
 class Settings(BaseSettings):
@@ -20,10 +37,9 @@ class Settings(BaseSettings):
 
     # HandBrake configuration
     hbb_path: str = "HandBrakeCLI"
-    # winget's per-user links dir for the current user (not the author's profile)
-    winget_hbb_path: str = str(
-        Path.home() / "AppData" / "Local" / "Microsoft" / "WinGet" / "Links" / "HandBrakeCLI.exe"
-    )
+    # Platform-aware fallback locations checked when `hbb_path` is not on PATH
+    # (comma-separated list in the environment, e.g. HBB_FALLBACK_PATHS=/usr/bin/HandBrakeCLI)
+    hbb_fallback_paths: list[str] = Field(default_factory=_default_hbb_fallback_paths)
     default_preset: str = "Fast 1080p30"
 
     # Watch folder configuration

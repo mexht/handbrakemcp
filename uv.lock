@@ -794,7 +794,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "pywin32" },
 ]
 
 [package.metadata]
@@ -827,7 +826,6 @@ dev = [
     { name = "pytest", specifier = ">=6.0" },
     { name = "pytest-asyncio", specifier = ">=0.15.0" },
     { name = "pytest-cov", specifier = ">=4.0" },
-    { name = "pywin32", specifier = ">=311" },
 ]
 
 [[package]]

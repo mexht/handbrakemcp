@@ -35,14 +35,24 @@ stands but every transcode fails: that one install is the whole onboarding.
 
 ## First-timer setup steps
 
-1. Install the engine (Windows):
-   ```powershell
-   winget install -e --id HandBrake.HandBrake.CLI --silent --accept-package-agreements --accept-source-agreements
-   ```
-   Close and reopen your terminal afterwards — winget command aliases only
-   appear in new shells.
+1. Install the engine:
+   - Windows (PowerShell):
+     ```powershell
+     winget install -e --id HandBrake.HandBrake.CLI --silent --accept-package-agreements --accept-source-agreements
+     ```
+     Close and reopen your terminal afterwards — winget command aliases only
+     appear in new shells.
+   - Linux (bash):
+     ```bash
+     sudo apt install handbrake-cli   # Debian/Ubuntu
+     sudo dnf install handbrake-cli   # Fedora
+     sudo pacman -S handbrake-cli     # Arch
+     ```
+     No new shell needed on Linux: distro packaging drops
+     `/usr/bin/HandBrakeCLI` directly, and the service probes that path
+     even without a PATH export.
 2. Prove the engine works:
-   ```powershell
+   ```text
    HandBrakeCLI --version
    # HandBrake 1.11.2 (...) — plus nvenc/nvdec lines on NVIDIA machines
    ```
@@ -53,15 +63,19 @@ stands but every transcode fails: that one install is the whole onboarding.
 
 ## Pitfalls
 
-- **The GUI is not the engine.** Installing the HandBrake desktop app gives you
-  `C:\Program Files\HandBrake\HandBrake.exe` (+ `HandBrake.Worker.exe`) —
-  neither is the CLI, and the GUI installer never ships `HandBrakeCLI.exe`. If
-  the dashboard says "HandBrake app found, but the CLI engine is missing", that
-  is exactly your situation: install the CLI *alongside* the app
-  (`winget install -e --id HandBrake.HandBrake.CLI`). The two coexist fine.
-- **New terminal required.** The #1 failure: installing HandBrakeCLI and
+- **The GUI is not the engine — on any platform.** Installing the HandBrake
+  desktop app gives you `C:\Program Files\HandBrake\HandBrake.exe` (+
+  `HandBrake.Worker.exe`) on Windows or `/usr/bin/handbrake` (`handbrake-gtk`)
+  on Linux — none of these is the CLI, and the GUI installer never ships
+  `HandBrakeCLI` (on Debian it is even a separate `handbrake-cli` package). If
+  the dashboard says "HandBrake app found, but the CLI engine is missing",
+  that is exactly your situation: install the CLI *alongside* the app. The
+  two coexist fine.
+- **New terminal required (Windows only).** The #1 failure: installing HandBrakeCLI and
   testing in the *same* shell. The `HandBrakeCLI` alias does not exist there.
   Open a fresh terminal (same reason the service checks PATH at startup).
+  Linux package managers install a real `/usr/bin/HandBrakeCLI`, so there is
+  no shell-restart trap there.
 - **The bridge is not the engine.** `get_presets()` returns a small fallback
   list (`Fast 1080p30`, …) when the CLI is missing — a working tool call with
   fallback presets does NOT mean onboarding is done. Trust the

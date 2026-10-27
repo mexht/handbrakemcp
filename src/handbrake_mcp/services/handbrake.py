@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -21,8 +22,19 @@ class HandBrakeError(Exception):
 
 
 def gui_install_paths() -> list[str]:
-    """Well-known HandBrake *GUI* install locations (which do NOT ship the CLI)."""
-    import os
+    """Well-known HandBrake *GUI* install locations (which do NOT ship the CLI).
+
+    Windows: ``Program Files`` layout. Linux: distro package locations — the
+    GUI ships as ``handbrake``/``handbrake-gtk``; ``HandBrakeCLI`` is always a
+    separate binary (on Debian it even lives in a separate ``handbrake-cli``
+    package). Used only to flag the classic GUI-without-engine trap.
+    """
+    if os.name != "nt":
+        return [
+            "/usr/bin/handbrake",
+            "/usr/bin/handbrake-gtk",
+            "/usr/local/bin/handbrake",
+        ]
 
     candidates = [
         r"C:\Program Files\HandBrake\HandBrake.exe",
@@ -37,26 +49,46 @@ def gui_install_paths() -> list[str]:
     return candidates
 
 
+def cli_install_hint() -> str:
+    """Platform-appropriate HandBrakeCLI install guidance for onboarding UX."""
+    if os.name == "nt":
+        return (
+            "install it with 'winget install -e --id HandBrake.HandBrake.CLI', then restart "
+            "the terminal so the new PATH entry becomes visible"
+        )
+    return (
+        "install it with your distro package manager (e.g. 'sudo apt install handbrake-cli' on "
+        "Debian/Ubuntu, 'sudo dnf install handbrake-cli' on Fedora, 'pacman -S handbrake-cli' on "
+        "Arch) — the desktop GUI package alone does not provide HandBrakeCLI — or set HBB_PATH "
+        "in your environment to an existing HandBrakeCLI binary"
+    )
+
+
 def probe_handbrake_cli() -> dict[str, Any]:
     """Non-raising HandBrakeCLI presence probe for /health and onboarding UX.
 
-    Checks PATH first, then the WinGet install location. Also reports whether
-    the HandBrake *GUI* is installed — the classic trap is seeing
-    ``C:\\Program Files\\HandBrake\\HandBrake.exe`` and assuming the engine is
-    there. The GUI never ships HandBrakeCLI. Never raises; the Dashboard red
-    onboarding CTA and the sanity check in docs/ONBOARDING.md read this.
+    Checks PATH first, then the platform fallback locations (winget links dir
+    on Windows, ``/usr/bin``-style package paths on Linux — see
+    ``settings.hbb_fallback_paths``). Also reports whether the HandBrake *GUI*
+    is installed — the classic trap is seeing ``HandBrake``/``HandBrake.exe``
+    and assuming the engine is there. The GUI never ships HandBrakeCLI on any
+    platform. Never raises; the Dashboard red onboarding CTA and the sanity
+    check in docs/ONBOARDING.md read this.
 
     ## Return Format
     `{"available": bool, "path": str | None, "gui_present": bool}`.
 
     ## Examples
-    `probe_handbrake_cli()` → `{"available": True, "path": "C:/.../HandBrakeCLI.exe", "gui_present": True}`.
+    `probe_handbrake_cli()` → `{"available": True, "path": "/usr/bin/HandBrakeCLI", "gui_present": False}`.
     """
     from handbrake_mcp.core.config import settings as _settings
 
     found = shutil.which(_settings.hbb_path)
-    if not found and Path(_settings.winget_hbb_path).exists():
-        found = _settings.winget_hbb_path
+    if not found:
+        for fallback in _settings.hbb_fallback_paths:
+            if Path(fallback).exists():
+                found = fallback
+                break
     gui = any(Path(p).exists() for p in gui_install_paths())
     return {"available": found is not None, "path": found, "gui_present": gui}
 
@@ -91,22 +123,27 @@ class HandBrakeService:
         self._max_option_value_length = 1000  # Maximum length for option values
 
     def _find_handbrake(self) -> Path:
-        """Find HandBrakeCLI in the system PATH or use configured path."""
+        """Find HandBrakeCLI in the system PATH or platform fallback locations."""
         # 1. Check standard PATH/configured path
         handbrake_path = shutil.which(settings.hbb_path)
 
-        # 2. Check WinGet fallback if standard fails
+        # 2. Check platform fallbacks (winget links dir on Windows, distro
+        #    package paths on Linux) if standard lookup fails
         if not handbrake_path:
-            logger.info(f"HandBrakeCLI not in PATH, checking WinGet fallback: {settings.winget_hbb_path}")
-            if Path(settings.winget_hbb_path).exists():
-                handbrake_path = settings.winget_hbb_path
+            for fallback in settings.hbb_fallback_paths:
+                if Path(fallback).exists():
+                    handbrake_path = fallback
+                    break
+            if not handbrake_path:
+                logger.info(
+                    f"HandBrakeCLI not in PATH, checked fallback locations: {settings.hbb_fallback_paths}"
+                )
 
         if not handbrake_path:
             raise HandBrakeError(
-                f"HandBrakeCLI not found. Checked PATH and {settings.winget_hbb_path}. "
-                f"Install it with: winget install -e --id HandBrake.HandBrake.CLI "
-                f"(see docs/ONBOARDING.md § First-timer setup steps), then restart "
-                f"your terminal so PATH picks it up — or set HBB_PATH in your environment variables."
+                f"HandBrakeCLI not found. Checked PATH and {settings.hbb_fallback_paths}. "
+                f"{cli_install_hint()} (see docs/ONBOARDING.md § First-timer setup steps), then restart "
+                f"your terminal — or set HBB_PATH in your environment variables."
             )
         return Path(handbrake_path)
 
@@ -115,18 +152,19 @@ class HandBrakeService:
         if self.handbrake_version is None:
             try:
                 result = await self._run_handbrake(["--version"])
-                # Parse version from output like "HandBrake 1.5.1 (2023010100)"
+                # Version line like "HandBrake 1.11.2 (2023010100)"; Arch/git
+                # nightly builds print an identifier instead ("HandBrake 20260607133641-abc-makepkg").
+                # Scan all lines: noise like "HandBrake has exited." must not mask it.
                 lines = result.strip().split("\n")
-                if lines:
-                    version_line = lines[0]
-                    # Extract version number from the line
-                    import re
+                import re
 
-                    version_match = re.search(r"HandBrake\s+([\d.]+)", version_line)
+                version_match = None
+                for line in lines:
+                    version_match = re.search(r"HandBrake\s+(\d[\w.-]*)", line)
                     if version_match:
-                        self.handbrake_version = version_match.group(1)
-                    else:
-                        self.handbrake_version = "unknown"
+                        break
+                if version_match:
+                    self.handbrake_version = version_match.group(1).strip("-")
                 else:
                     self.handbrake_version = "unknown"
             except Exception as e:
@@ -285,18 +323,21 @@ class HandBrakeService:
         # Convert to string for validation
         path_str = str(path)
 
-        # Security: Prevent dangerous characters (allow colon for Windows drive letters)
+        # Security: Prevent dangerous characters (shell metacharacters are rejected
+        # on every platform; a colon is additionally constrained to a Windows drive
+        # prefix like `C:\`, but on POSIX ':' is an ordinary filename character)
         dangerous_chars = ["<", ">", '"', "|", "?", "*"]
         for char in dangerous_chars:
             if char in path_str:
                 raise ValueError(f"Invalid characters in path: {path}")
 
-        # Allow single colon for Windows drive letters (e.g., C:\)
-        colon_count = path_str.count(":")
-        if colon_count > 1:
-            raise ValueError(f"Invalid path format: {path}")
-        if colon_count == 1 and not (len(path_str) > 1 and path_str[1] == ":"):
-            raise ValueError(f"Invalid colon usage in path: {path}")
+        if os.name == "nt":
+            # Allow single colon for Windows drive letters (e.g., C:\)
+            colon_count = path_str.count(":")
+            if colon_count > 1:
+                raise ValueError(f"Invalid path format: {path}")
+            if colon_count == 1 and not (len(path_str) > 1 and path_str[1] == ":"):
+                raise ValueError(f"Invalid colon usage in path: {path}")
 
         # Convert to Path object and resolve
         path_obj = Path(path).resolve()
@@ -441,7 +482,6 @@ class HandBrakeService:
             logger.warning(f"Disk-space check skipped: {e}")
 
     @staticmethod
-    @staticmethod
     def _extract_progress(transcript: str) -> float | None:
         """Last ``Progress.Working.Progress`` from a ``--json`` transcript.
 
@@ -472,9 +512,14 @@ class HandBrakeService:
             buf = []
             if not isinstance(data, dict):
                 continue
+            # Real CLI 1.x: `Progress: {"State": ..., "Working": {"Progress": x}}`
+            # (the "Working" block sits directly under the "Progress:"-prefixed
+            # object); tolerate an older wrapper shape if encountered.
+            working = data.get("Working") if isinstance(data.get("Working"), dict) else None
             prog = data.get("Progress")
-            working = prog.get("Working", {}) if isinstance(prog, dict) else {}
-            val = working.get("Progress") if isinstance(working, dict) else None
+            if working is None and isinstance(prog, dict):
+                working = prog.get("Working") if isinstance(prog.get("Working"), dict) else None
+            val = working.get("Progress") if working else None
             if isinstance(val, bool):
                 continue
             if isinstance(val, (int, float)):

@@ -94,7 +94,7 @@ async def lifespan(mcp_instance: FastMCP):
 mcp = FastMCP(
     "HandBrake MCP",
     lifespan=lifespan,
-    instructions="""You are HandBrake MCP, an automation server for video transcoding on Windows.
+    instructions="""You are HandBrake MCP, an automation server for video transcoding on Windows and Linux.
 
 FEATURES:
 - Conversational tool returns for natural AI interaction
@@ -246,7 +246,11 @@ async def diagnostics():
         "uptime_seconds": 0,
         "tool_count": len(tools),
         "tools": [{"name": t.name} for t in tools],
-        "system": {"windows": platform.system() == "Windows"},
+        "system": {
+            "platform": platform.system(),
+            "windows": platform.system() == "Windows",
+            "linux": platform.system() == "Linux",
+        },
         "errors": [],
     }
 
@@ -279,7 +283,7 @@ async def health():
     memory = psutil.virtual_memory()
     tools = await mcp.list_tools()
 
-    from handbrake_mcp.services.handbrake import probe_handbrake_cli
+    from handbrake_mcp.services.handbrake import cli_install_hint, probe_handbrake_cli
 
     cli = probe_handbrake_cli()
     cli_version = "unknown"
@@ -332,9 +336,8 @@ async def health():
             "gui_present": cli["gui_present"],
             "instance_configured": bool(cli["available"]),
             "hint": (
-                "HandBrake GUI found but the HandBrakeCLI engine is missing "
-                "(the GUI never ships the CLI): install it with "
-                "'winget install -e --id HandBrake.HandBrake.CLI', then restart the terminal."
+                f"HandBrake GUI found but the HandBrakeCLI engine is missing "
+                f"(the GUI never ships the CLI): {cli_install_hint()}."
                 if (not cli["available"] and cli["gui_present"])
                 else None
             ),
@@ -469,23 +472,27 @@ async def browse_files(path: str | None = None):
 
     The webapp and the video files live on the same machine, so the picker
     browses server-side paths (a browser `<input type=file>` would only yield
-    fake paths the backend cannot open). `path=None` lists Windows drives.
+    fake paths the backend cannot open). `path=None` lists root anchors:
+    Windows drives, POSIX mount roots plus the home directory.
     """
-    import string
-
     if not path:
+        home = str(Path.home())
+        roots: list[Path]
+        if os.name == "nt":
+            import string
+
+            roots = [Path(f"{letter}:\\") for letter in string.ascii_uppercase]
+        else:
+            roots = [Path(p) for p in ("/", "/home", "/mnt", "/media", home)]
         drives = []
-        for letter in string.ascii_uppercase:
-            candidate = Path(f"{letter}:\\")
+        seen: set[str] = set()
+        for candidate in roots:
             try:
-                if candidate.exists():
-                    drives.append({"name": f"{letter}:\\", "path": str(candidate), "type": "drive"})
+                if candidate.is_dir() and str(candidate) not in seen:
+                    seen.add(str(candidate))
+                    drives.append({"name": str(candidate), "path": str(candidate), "type": "drive"})
             except OSError:
                 continue
-        try:
-            home = str(Path.home())
-        except Exception:
-            home = ""
         return {"status": "ok", "cwd": "", "parent": None, "entries": drives, "home": home}
 
     try:
