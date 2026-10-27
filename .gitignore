@@ -47,6 +47,11 @@ output.txt
 # Editor swap files
 *.kate-swp
 
+# Editor backups and session scratch
+*.bak
+*.bak-*
+.assess-fix-timestamp
+
 # Local development
 *.local
 

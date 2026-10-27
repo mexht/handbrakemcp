@@ -39,7 +39,7 @@ python -m pip install --upgrade pip
 
 # Install development dependencies
 Write-Host "Installing development dependencies..." -ForegroundColor Cyan
-pip install -r requirements-dev.txt
+pip install -r "$PSScriptRoot\..\requirements-dev.txt"
 
 # Install package in development mode
 Write-Host "Installing package in development mode..." -ForegroundColor Cyan

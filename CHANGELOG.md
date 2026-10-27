@@ -16,6 +16,21 @@
 - `.env.example`: `HBB_PATH=HandBrakeCLI` with the Windows absolute-path example removed; `HBB_FALLBACK_PATHS` documented.
 - `docs/ONBOARDING.md`: Linux install commands in first-timer steps; GUI-vs-CLI and terminal pitfalls now platform-labelled (the shell-restart trap is Windows-only).
 
+### Cleaned (repo root)
+- **Removed completed todo/session notes**: `PLAN.md` (status: completed), `TASK_NOTE.md`, `ASSESSMENT.md`,
+  `COMPLETION_NOTE.md` — all describe finished v1.0 work and were the only "todo" artifacts at the root.
+- **Removed duplicates and backups**: `.windsurfrules` (byte-identical to `.cursorrules`) and
+  `.cursorrules.bak-20261024-081931`, `.windsurfrules.bak-20261024-081931`; the self-assess scratch marker
+  `.assess-fix-timestamp` (session metadata from a Windows host). Backup patterns now in `.gitignore`.
+- **Moved out of the root**: `CI-CD-README.md` → `docs/CI-CD-README.md`; one-shot Windows bootstrap
+  scripts `setup_dev.ps1` and `setup_git.ps1` → `scripts/` (`setup_dev.ps1` now resolves
+  `requirements-dev.txt` via `$PSScriptRoot`).
+- **Left at the root on purpose**: `manifest.json`, `glama.json`, `llms.txt`/`llms-full.txt`,
+  `mkdocs.yml`, `requirements-dev.txt` (fleet conventions), `run_server.py` + `handbrake-mcp-backend.spec`
+  (PyInstaller entry/spec pair, `native/build.ps1` resolves the spec at the root), `start.bat`/`start.ps1`
+  (fleet launcher convention, used by `src/handbrake_mcp/main.py` and `scripts/FleetStartMode.ps1`),
+  `fleet-start.config.ps1`, `AGENTS.md`/`CLAUDE.md`, `Dockerfile`, `docker-compose.yml`.
+
 ## [Unreleased] — 2026-10-23 (app bugs)
 
 ### Fixed

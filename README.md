@@ -4,7 +4,6 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square)](https://github.com/PrefectHQ/fastmcp)
-[![CI](https://github.com/sandraschi/handbrake-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sandraschi/handbrake-mcp/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/Docker-Supported-blue)](https://www.docker.com/)
 [![Security](https://img.shields.io/badge/Security-Enabled-red)](SECURITY.md)
 [![Discussions](https://img.shields.io/badge/Community-Active-blueviolet)](https://github.com/sandraschi/handbrake-mcp/discussions)
@@ -20,7 +19,7 @@ Runs natively on **Windows and Linux**.
 ## Quick Start
 
 ```bash
-git clone https://github.com/sandraschi/handbrake-mcp
+git clone https://github.com/mexht/handbrakemcp.git
 cd handbrake-mcp
 just                 # lists every recipe
 just bootstrap       # install dev deps + pre-commit hooks
@@ -114,6 +113,10 @@ Standards rules were checked manually (the PowerShell checker cannot run here).
   artifact (still ignored, now untracked).
 - `run_server.py` stays at the root on purpose — `scripts/mcpb-pack.ps1` and the PyInstaller build use
   it as the frozen entry point.
+- Root trimmed for a shorter GitHub listing: completed todo notes (`PLAN.md`, `TASK_NOTE.md`,
+  `ASSESSMENT.md`, `COMPLETION_NOTE.md`) deleted, the duplicate `.windsurfrules` and two `*.bak`
+  backups dropped, `CI-CD-README.md` moved to `docs/`, and the one-shot `setup_dev.ps1`/`setup_git.ps1`
+  moved to `scripts/`.
 - Left as upstream design (fixing would mean inventing content): `assets/icon.svg`,
   `assets/prompts/system.md`, `requirements.txt`, `release.yml`.
 

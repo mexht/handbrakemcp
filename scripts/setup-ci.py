@@ -130,7 +130,7 @@ def validate_ci_cd_setup():
         print("2. Configure repository secrets (optional)")
         print("3. Push to main branch to trigger CI/CD")
         print("4. Check .github/workflows/ for workflow files")
-        print("5. See CI-CD-README.md for detailed documentation")
+        print("5. See docs/CI-CD-README.md for detailed documentation")
     else:
         print("❌ Some checks failed. Please review the output above.")
         return False
