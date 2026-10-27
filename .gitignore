@@ -44,6 +44,9 @@ coverage.xml
 error.txt
 output.txt
 
+# Editor swap files
+*.kate-swp
+
 # Local development
 *.local
 
