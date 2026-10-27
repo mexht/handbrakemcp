@@ -76,6 +76,42 @@ If you don't have `just` installed:
 - ** Contributing Guide**: Clear development and contribution guidelines
 - ** Repository Profile**: Enhanced project showcase and discoverability
 
+## Changes in this fork
+
+This fork runs **natively on Linux** — upstream is Windows-first. Branch `local` implements full Linux compatibility (commit `01e6355`):
+
+### Engine discovery & platform layer
+- **Platform-aware CLI discovery**: `winget_hbb_path` → `hbb_fallback_paths` — winget links dir on Windows; `/usr/bin/HandBrakeCLI`, `/usr/local/bin`, `/opt/handbrake` on Linux. Overridable via `HBB_FALLBACK_PATHS=a,b,c`.
+- **GUI probes cover distro paths** (`/usr/bin/handbrake[-gtk]`), so the classic "GUI installed, engine missing" trap is flagged on Linux too.
+- **Platform-aware install hints** (`cli_install_hint()`): winget guidance on Windows, `apt`/`dnf`/`pacman` guidance on Linux in errors and `/health`.
+- **POSIX path rules**: the `C:\` drive-letter colon rule is now Windows-only, so Linux filenames like `clip:2024.mp4` are legal.
+
+### HTTP/app layer
+- `/api/browse` dashboard picker lists POSIX mount roots (`/`, `/home`, `/mnt`, home) instead of scanning `A:\`–`Z:\`.
+- `/api/v1/diagnostics` reports `platform`/`linux`; FastMCP instructions state Windows **and** Linux.
+- Legacy `/api/fleet/launch` launches `start.sh` via `/bin/sh` on POSIX (previously crashed with `powershell.exe`/`CREATE_NEW_CONSOLE`); fleet root configurable via `FLEET_REPOS_ROOT`.
+
+### Packaging & tooling
+- **pyproject**: dropped the unused `pywin32` dev dependency (it blocked `uv` resolution on Linux); added `Operating System :: POSIX :: Linux` classifier.
+- **justfile**: portable `cd … && …` recipes (no forced PowerShell shell).
+- `.env.example` and `docs/ONBOARDING.md` updated with Linux install commands; the shell-restart pitfall is now labelled Windows-only.
+
+### Bonus fixes (pre-existing, only visible running natively on Linux)
+- `_extract_progress` expected a wrong JSON nesting level; real HandBrakeCLI emits `Progress: { "Working": { "Progress": x } }` — parser fixed (double `@staticmethod` removed, invalid-JSON test transcript corrected).
+- Version parsing choked on Arch/git build ids (`HandBrake 20260607133641-…-makepkg`); now scans all lines and accepts both semver and build identifiers.
+
+### Verified on this Linux box
+- **Full test suite green: 24 passed**, including real `HandBrakeCLI` integration tests with actual encodes.
+- `/health` reports `cli_available: true, cli_path: /usr/bin/HandBrakeCLI, instance_configured: true`.
+- `POST /api/transcode` → real encode completes at `progress: 100.0`; stdio entry (`uv run handbrake-mcp-stdio`) starts cleanly.
+- All changed files are ruff-clean.
+
+### Repo compliance (standards checker, run manually on Linux)
+- `CONTRIBUTING.md` moved to the repo root (the checker only accepts a root-level guide; GitHub renders either location).
+- Dropped tracked junk: `error.txt`/`output.txt` (captured run logs) and the `.coverage` artifact (now untracked; it was committed despite being in `.gitignore`).
+- `run_server.py` stays at the root on purpose — `scripts/mcpb-pack.ps1` and the PyInstaller build use it as the frozen entry point, so the checker's "move to scripts/" heuristic does not apply.
+- Not changed (upstream design, would require inventing content): `assets/icon.svg`, `assets/prompts/system.md`, `requirements.txt`, `release.yml`.
+
 ##  Quick Start
 
 ### Prerequisites

@@ -41,6 +41,8 @@ logs/
 *.log
 .coverage
 coverage.xml
+error.txt
+output.txt
 
 # Local development
 *.local
