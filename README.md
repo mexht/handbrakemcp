@@ -93,7 +93,7 @@ This fork runs **natively on Linux** — upstream is Windows-first. Branch `loca
 
 ### Packaging & tooling
 - **pyproject**: dropped the unused `pywin32` dev dependency (it blocked `uv` resolution on Linux); added `Operating System :: POSIX :: Linux` classifier.
-- **justfile**: portable `cd … && …` recipes (no forced PowerShell shell).
+- **justfile**: portable `cd … && …` recipes (no forced PowerShell shell); removed the local `mcpb-pack` recipe, which duplicated the one imported from `scripts/just/fleet.just` — just rejects duplicate recipes, so every `just` invocation failed. The fleet shim (`scripts/mcpb-pack.ps1`) remains available.
 - `.env.example` and `docs/ONBOARDING.md` updated with Linux install commands; the shell-restart pitfall is now labelled Windows-only.
 
 ### Bonus fixes (pre-existing, only visible running natively on Linux)

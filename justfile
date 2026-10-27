@@ -31,9 +31,8 @@ test:
 fmt:
     uv run ruff format .
 
-# Pack the MCPB distribution bundle via the fleet shim (Windows tooling)
-mcpb-pack:
-    powershell.exe -NoProfile -File '{{justfile_directory()}}\scripts\mcpb-pack.ps1'
+# MCPB packing comes from scripts/just/fleet.just (mcpb-pack). Do not redefine it here:
+# just rejects duplicate recipes, and the fleet shim is the canonical scripts/mcpb-pack.ps1 path.
 
 # --- Hardening ---
 

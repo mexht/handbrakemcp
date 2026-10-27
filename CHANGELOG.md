@@ -7,7 +7,9 @@
   - `services/handbrake.py`: `gui_install_paths()` covers distro GUI locations (`/usr/bin/handbrake[-gtk]`); probe and `_find_handbrake()` walk the fallback list; shared `cli_install_hint()` emits winget guidance on Windows, apt/dnf/pacman guidance on Linux. Path validation keeps the drive-letter colon rule Windows-only — POSIX `file:name.mp4` is now legal.
   - `server.py`: instructions state Windows **and** Linux; `/api/v1/diagnostics` reports `platform`/`linux`; `/health` hint uses `cli_install_hint()`; `/api/browse` picker roots are POSIX mounts (`/`, `/home`, `/mnt`, `/media`, home) instead of `A:\`–`Z:\` scans.
   - `main.py` (legacy entry): `/api/fleet/launch` launches `start.sh` via `/bin/sh` with `start_new_session` on POSIX (no more `powershell.exe`/`CREATE_NEW_CONSOLE` crash); fleet root configurable via `FLEET_REPOS_ROOT`.
-  - `justfile`: lint/fix/check-sec/bootstrap recipes portable (`cd … && …`, no `Set-Location`/`Write-Host`).
+  - `justfile`: lint/fix/check-sec/bootstrap recipes portable (`cd … && …`, no `Set-Location`/`Write-Host`); local
+    `mcpb-pack` recipe removed — it collided with the one imported from `scripts/just/fleet.just`, and just aborts
+    parsing on duplicate recipes, so every `just` invocation (even the dashboard) failed.
 - Probe fallback test + POSIX colon path-validation test (skipped on Windows).
 
 ### Updated
